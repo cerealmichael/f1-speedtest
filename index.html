@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<meta name="mobile-web-app-capable" content="yes">
+<title>ReactLab — measure your reflexes</title>
+<style>
+  :root{
+    --bg:#0f1115;
+    --panel:#161922;
+    --accent:#4f8cff;
+    --text:#e6e8ee;
+    --muted:#7c8393;
+    --gold:#ffd700;
+    --ferrari:#ff2800;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;}
+  html{overscroll-behavior:none;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    min-height:100dvh;
+    overflow:hidden;
+    overscroll-behavior:none;
+    touch-action:none;
+    -webkit-user-select:none;
+    user-select:none;
+    position:fixed;
+    inset:0;
+    width:100%;
+  }
+
+  /* ---------- generic screen container ---------- */
+  .screen{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    height:100dvh;
+    width:100%;
+    padding:24px;
+    text-align:center;
+    transition:background-color .25s ease;
+  }
+  .hidden{display:none !important;}
+
+  /* ---------- PHASE 1: ReactLab shell ---------- */
+  #home .logo{
+    font-size:clamp(38px,13vw,64px);
+    font-weight:800;
+    letter-spacing:-1px;
+    margin:0;
+  }
+  #home .logo b{color:var(--accent);}
+  #home .subtitle{
+    color:var(--muted);
+    font-size:16px;
+    margin-top:6px;
+    letter-spacing:.5px;
+  }
+  .primary-btn{
+    margin-top:44px;
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    border-radius:16px;
+    font-size:22px;
+    font-weight:700;
+    padding:22px 40px;
+    min-width:240px;
+    min-height:72px;
+    cursor:pointer;
+    box-shadow:0 8px 24px rgba(79,140,255,.28);
+    transition:transform .08s ease, box-shadow .2s ease;
+    font-family:inherit;
+  }
+  .primary-btn:active{transform:scale(.96);box-shadow:0 4px 12px rgba(79,140,255,.24);}
+  .stat{
+    margin-top:28px;
+    color:var(--muted);
+    font-size:15px;
+    min-height:20px;
+  }
+  .stat b{color:var(--text);}
+  .round-pill{
+    margin-top:14px;
+    font-size:13px;
+    color:var(--muted);
+    border:1px solid #232838;
+    border-radius:999px;
+    padding:5px 14px;
+  }
+  .footer{
+    position:absolute;
+    bottom:calc(env(safe-area-inset-bottom,0px) + 16px);
+    left:0;right:0;
+    text-align:center;
+    color:#4a4f5e;
+    font-size:12px;
+    letter-spacing:.4px;
+  }
+
+  /* waiting / go / result reuse one screen with background swap */
+  #test{cursor:pointer;}
+  #test.state-wait{background:var(--ferrari);}
+  #test.state-go{background:#12c46a;}
+  #test.state-result{background:var(--panel);}
+  #test .big{
+    font-size:clamp(30px,10vw,52px);
+    font-weight:800;
+    line-height:1.1;
+  }
+  #test .sub{
+    margin-top:18px;
+    font-size:18px;
+    opacity:.9;
+  }
+  #test .ms{
+    font-size:clamp(56px,22vw,120px);
+    font-weight:900;
+    letter-spacing:-2px;
+    font-variant-numeric:tabular-nums;
+  }
+
+  /* ---------- PHASE 2: hijack / black stage ---------- */
+  #stage{
+    background:#000;
+    opacity:0;
+    pointer-events:none;
+    z-index:20;
+    padding:0;
+    transition:opacity 1s ease;
+    overflow:hidden;
+  }
+  #stage.on{opacity:1;pointer-events:auto;}
+
+  /* start-light gantry */
+  #gantry{
+    display:flex;
+    gap:clamp(10px,3.4vw,22px);
+    justify-content:center;
+    align-items:flex-start;
+    transition:opacity .6s ease;
+  }
+  .light-col{
+    display:flex;
+    flex-direction:column;
+    gap:clamp(8px,2.6vw,16px);
+    background:#0a0a0a;
+    padding:clamp(8px,2.4vw,14px);
+    border-radius:12px;
+    border:1px solid #1c1c1c;
+  }
+  .bulb{
+    width:clamp(30px,9.4vw,54px);
+    height:clamp(30px,9.4vw,54px);
+    border-radius:50%;
+    background:#2a0000;
+    box-shadow:inset 0 0 6px rgba(0,0,0,.8);
+    transition:background .06s linear, box-shadow .06s linear;
+    will-change:background,box-shadow;
+  }
+  .bulb.lit{
+    background:radial-gradient(circle at 40% 35%, #ff6a5a, #ff2800 60%, #b00000);
+    box-shadow:0 0 18px 4px rgba(255,40,0,.75), inset 0 0 6px rgba(255,150,120,.6);
+  }
+
+  /* ---------- PHASE 3: reveal ---------- */
+  #reveal{
+    z-index:22;
+    background:transparent;
+    pointer-events:none;
+    justify-content:flex-start;
+    padding-top:calc(env(safe-area-inset-top,0px) + 10px);
+    padding-bottom:calc(env(safe-area-inset-bottom,0px) + 90px);
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    display:none;
+  }
+  #reveal.on{display:flex;pointer-events:auto;touch-action:pan-y;}
+
+  .lights-out{
+    font-style:italic;
+    font-weight:900;
+    font-size:clamp(26px,8.4vw,46px);
+    line-height:1.02;
+    text-transform:uppercase;
+    letter-spacing:-1px;
+    transform:translateY(40px);
+    opacity:0;
+    color:#fff;
+    text-shadow:0 2px 18px rgba(255,40,0,.5);
+    margin:8px 0 0;
+    transition:transform .8s cubic-bezier(.2,.9,.2,1), opacity .8s ease;
+  }
+  .lights-out.in{transform:translateY(0);opacity:1;}
+
+  .birthday-line{
+    margin-top:18px;
+    font-weight:800;
+    font-style:italic;
+    font-size:clamp(18px,5.4vw,26px);
+    line-height:1.25;
+    letter-spacing:-.3px;
+    color:var(--gold);
+    max-width:640px;
+    opacity:0;
+    transform:scale(.9);
+    transition:transform .7s cubic-bezier(.2,.9,.2,1), opacity .7s ease;
+  }
+  .birthday-line.in{opacity:1;transform:scale(1);}
+  .birthday-line .flag{color:#fff;font-style:normal;}
+
+  /* team radio */
+  .section-label{
+    align-self:center;
+    margin:34px 0 12px;
+    font-size:12px;
+    letter-spacing:3px;
+    color:var(--muted);
+    font-weight:700;
+    opacity:0;
+    transition:opacity .5s ease;
+  }
+  .section-label.in{opacity:1;}
+
+  .radio{
+    width:100%;
+    max-width:560px;
+    background:#0c0c0e;
+    border:1px solid #24262e;
+    border-radius:18px;
+    padding:14px;
+    display:flex;
+    gap:14px;
+    align-items:center;
+    box-shadow:0 10px 30px rgba(0,0,0,.5);
+    opacity:0;
+    transform:translateY(20px);
+    transition:opacity .5s ease, transform .5s ease;
+  }
+  .radio.in{opacity:1;transform:translateY(0);}
+  .radio .avatar,
+  .radio .avatar-fallback{
+    width:64px;height:64px;flex:0 0 64px;
+    border-radius:10px;
+    object-fit:cover;
+    background:#1a1c22;
+  }
+  .radio .avatar-fallback{
+    display:none;
+    align-items:center;justify-content:center;
+    font-size:32px;
+  }
+  .radio .body{flex:1;min-width:0;text-align:left;}
+  .radio .who{
+    font-size:12px;letter-spacing:1.5px;color:var(--muted);
+    font-weight:700;margin-bottom:6px;
+  }
+  .radio .who b{color:var(--gold);}
+  .radio .msg{
+    font-size:15px;line-height:1.35;color:#f0f2f6;
+    min-height:20px;font-weight:600;
+  }
+  .radio .msg .cursor{
+    display:inline-block;width:8px;
+    margin-left:1px;
+    animation:blink 1s steps(1) infinite;
+    color:var(--accent);
+  }
+  @keyframes blink{50%{opacity:0;}}
+
+  /* animated waveform */
+  .wave{
+    display:flex;gap:3px;align-items:flex-end;height:22px;margin-top:10px;
+  }
+  .wave span{
+    width:3px;background:var(--accent);border-radius:2px;height:6px;
+    animation:eq .9s ease-in-out infinite;
+    opacity:.5;
+  }
+  .wave.live span{opacity:1;}
+  .wave span:nth-child(2){animation-delay:.1s;}
+  .wave span:nth-child(3){animation-delay:.2s;}
+  .wave span:nth-child(4){animation-delay:.3s;}
+  .wave span:nth-child(5){animation-delay:.15s;}
+  .wave span:nth-child(6){animation-delay:.25s;}
+  .wave span:nth-child(7){animation-delay:.05s;}
+  @keyframes eq{0%,100%{height:5px;}50%{height:22px;}}
+
+  /* classification table */
+  .classification{
+    width:100%;max-width:560px;
+    display:flex;flex-direction:column;gap:8px;
+  }
+  .row{
+    display:flex;align-items:center;gap:12px;
+    background:#111319;
+    border:1px solid #23262f;
+    border-radius:12px;
+    padding:14px 16px;
+    opacity:0;transform:translateX(-24px);
+    transition:opacity .45s ease, transform .45s cubic-bezier(.2,.9,.2,1);
+  }
+  .row.in{opacity:1;transform:translateX(0);}
+  .row .pos{
+    font-weight:900;font-size:18px;width:38px;flex:0 0 38px;
+    color:var(--muted);font-variant-numeric:tabular-nums;
+  }
+  .row .name{flex:1;text-align:left;font-weight:800;letter-spacing:.3px;font-size:16px;}
+  .row .gap{color:var(--muted);font-size:14px;font-weight:700;}
+  .row.p1{
+    background:linear-gradient(90deg, rgba(255,215,0,.18), rgba(255,215,0,.04));
+    border-color:var(--gold);
+  }
+  .row.p1 .pos{color:var(--gold);}
+  .row.p1 .gap{color:var(--gold);}
+
+  /* podium */
+  .podium-wrap{
+    position:relative;
+    width:100%;max-width:560px;
+    margin-top:8px;
+    opacity:0;transform:scale(.94);
+    transition:opacity .6s ease, transform .6s ease;
+  }
+  .podium-wrap.in{opacity:1;transform:scale(1);}
+  .podium-wrap img,
+  .podium-wrap .podium-fallback{
+    width:100%;
+    display:block;
+    border-radius:16px;
+    border:1px solid #23262f;
+  }
+  .podium-wrap .podium-fallback{
+    display:none;
+    aspect-ratio:4/3;
+    background:linear-gradient(135deg,#161922,#0c0c0e);
+    align-items:center;justify-content:center;
+    font-size:20px;color:var(--muted);
+    text-align:center;flex-direction:column;gap:10px;
+  }
+  .podium-wrap .podium-fallback .k{font-size:64px;}
+
+  .replay-btn{
+    margin:30px auto 0;
+    background:transparent;
+    color:var(--text);
+    border:1px solid #333743;
+    border-radius:999px;
+    font-size:15px;font-weight:700;
+    padding:14px 26px;min-height:52px;
+    cursor:pointer;font-family:inherit;
+    opacity:0;transition:opacity .5s ease, transform .08s ease;
+  }
+  .replay-btn.in{opacity:1;}
+  .replay-btn:active{transform:scale(.95);}
+
+  /* confetti + champagne canvas overlay */
+  #fx{
+    position:absolute;inset:0;
+    width:100%;height:100dvh;
+    pointer-events:none;
+    z-index:21;
+  }
+</style>
+</head>
+<body>
+
+  <!-- ============ PHASE 1: ReactLab ============ -->
+  <div id="home" class="screen">
+    <h1 class="logo">React<b>Lab</b></h1>
+    <div class="subtitle">measure your reflexes</div>
+    <button id="startBtn" class="primary-btn">Start test</button>
+    <div id="best" class="stat">No result yet — tap start.</div>
+    <div id="roundPill" class="round-pill">round 1 / 3</div>
+    <div class="footer">v0.3.1 • made by&nbsp;</div>
+  </div>
+
+  <div id="test" class="screen hidden">
+    <div id="testInner"></div>
+  </div>
+
+  <!-- ============ PHASE 2: hijack stage ============ -->
+  <div id="stage" class="screen">
+    <div id="gantry"></div>
+  </div>
+
+  <!-- fx canvas (confetti / champagne) -->
+  <canvas id="fx"></canvas>
+
+  <!-- ============ PHASE 3: reveal ============ -->
+  <div id="reveal" class="screen">
+    <div id="lightsOut" class="lights-out">IT'S LIGHTS OUT<br>AND AWAY WE GO...</div>
+    <div id="birthdayLine" class="birthday-line">
+      DAWID KOŃCZY DZIŚ … LAT?<br>
+      NIE, TO JA PAMIĘTAM O TWOICH URODZINACH <span class="flag">🏁</span><br>
+      WSZYSTKIEGO NAJLEPSZEGO!
+    </div>
+
+    <div id="radioLabel" class="section-label">TEAM RADIO</div>
+    <div id="radio" class="radio">
+      <img id="radioAvatar" class="avatar" src="dawid.jpg" alt="Dawid" onerror="this.style.display='none';document.getElementById('radioAvatarFallback').style.display='flex';">
+      <div id="radioAvatarFallback" class="avatar-fallback">🏎️</div>
+      <div class="body">
+        <div class="who"><b>DAW</b> | Team Radio</div>
+        <div id="radioMsg" class="msg"></div>
+        <div id="wave" class="wave">
+          <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+
+    <div id="classLabel" class="section-label">RACE CLASSIFICATION</div>
+    <div id="classification" class="classification">
+      <div class="row p1"><div class="pos">P1</div><div class="name">DAWID</div><div class="gap">LEADER</div></div>
+      <div class="row"><div class="pos">P2</div><div class="name">VERSTAPPEN</div><div class="gap">+1 year</div></div>
+      <div class="row"><div class="pos">P3</div><div class="name">HAMILTON</div><div class="gap">+birthday</div></div>
+    </div>
+
+    <div id="podiumLabel" class="section-label">PODIUM</div>
+    <div id="podium" class="podium-wrap">
+      <img id="podiumImg" alt="Dawid podium">
+      <div id="podiumFallback" class="podium-fallback"><div class="k">🏆</div><div>P1 — DAWID</div></div>
+    </div>
+
+    <button id="replayBtn" class="replay-btn">🔁 Replay lights</button>
+  </div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ============================================================
+     STATE
+  ============================================================ */
+  var roundsDone = 0;        // honest reaction rounds completed
+  var HONEST_ROUNDS = 2;     // hijack triggers on the (HONEST_ROUNDS+1)th start
+  var bestMs = null;
+  var audioUnlocked = false;
+
+  var el = function(id){ return document.getElementById(id); };
+  var home = el('home');
+  var test = el('test');
+  var testInner = el('testInner');
+  var stage = el('stage');
+  var gantry = el('gantry');
+  var reveal = el('reveal');
+  var bestOut = el('best');
+  var roundPill = el('roundPill');
+
+  function vibrate(pattern){
+    try{ if(navigator.vibrate) navigator.vibrate(pattern); }catch(e){}
+  }
+
+  /* ============================================================
+     AUDIO — everything synthesised, no external files
+  ============================================================ */
+  var AC = null;
+  function ensureAudio(){
+    if(!AC){
+      try{
+        var Ctx = window.AudioContext || window.webkitAudioContext;
+        AC = new Ctx();
+      }catch(e){ AC = null; }
+    }
+    if(AC && AC.state === 'suspended'){ AC.resume(); }
+    return AC;
+  }
+
+  // Unlock audio on first user gesture (Chrome autoplay policy).
+  function unlockAudio(){
+    if(audioUnlocked) return;
+    audioUnlocked = true;
+    var ctx = ensureAudio();
+    if(!ctx) return;
+    // play + immediately silence a tiny buffer to fully unlock the context
+    try{
+      var buf = ctx.createBuffer(1, 1, 22050);
+      var src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start(0);
+    }catch(e){}
+  }
+
+  function beep(freq, dur, vol){
+    var ctx = ensureAudio();
+    if(!ctx) return;
+    var t = ctx.currentTime;
+    var o = ctx.createOscillator();
+    var g = ctx.createGain();
+    o.type = 'square';
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol || 0.18, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + (dur || 0.09));
+    o.connect(g).connect(ctx.destination);
+    o.start(t);
+    o.stop(t + (dur || 0.09) + 0.02);
+  }
+
+  // Synthetic revving V10-ish engine using layered oscillators.
+  var Engine = {
+    nodes:null,
+    start:function(){
+      var ctx = ensureAudio();
+      if(!ctx) return;
+      this.stop();
+      var t = ctx.currentTime;
+      var master = ctx.createGain();
+      master.gain.setValueAtTime(0.0001, t);
+      var filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(700, t);
+      filter.Q.value = 6;
+      var saw = ctx.createOscillator();
+      saw.type = 'sawtooth';
+      saw.frequency.setValueAtTime(60, t);
+      var square = ctx.createOscillator();
+      square.type = 'square';
+      square.frequency.setValueAtTime(30, t);
+      // subtle LFO for a rough idle wobble
+      var lfo = ctx.createOscillator();
+      lfo.type = 'sine';
+      lfo.frequency.value = 11;
+      var lfoGain = ctx.createGain();
+      lfoGain.gain.value = 8;
+      lfo.connect(lfoGain).connect(saw.frequency);
+      saw.connect(filter);
+      square.connect(filter);
+      filter.connect(master).connect(ctx.destination);
+      saw.start(t); square.start(t); lfo.start(t);
+      this.nodes = {master:master, filter:filter, saw:saw, square:square, lfo:lfo};
+    },
+    // gradually warm up over the given seconds
+    warmup:function(seconds){
+      if(!this.nodes) return;
+      var ctx = AC, t = ctx.currentTime, n = this.nodes;
+      n.master.gain.cancelScheduledValues(t);
+      n.master.gain.setValueAtTime(Math.max(0.0001, n.master.gain.value), t);
+      n.master.gain.linearRampToValueAtTime(0.16, t + seconds);
+      n.saw.frequency.linearRampToValueAtTime(180, t + seconds);
+      n.square.frequency.linearRampToValueAtTime(90, t + seconds);
+      n.filter.frequency.linearRampToValueAtTime(1400, t + seconds);
+    },
+    // launch: quick pitch-up + gain spike, then fade
+    rev:function(){
+      if(!this.nodes){ return; }
+      var ctx = AC, t = ctx.currentTime, n = this.nodes;
+      n.master.gain.cancelScheduledValues(t);
+      n.master.gain.setValueAtTime(n.master.gain.value, t);
+      n.master.gain.linearRampToValueAtTime(0.30, t + 0.18);
+      n.master.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
+      n.saw.frequency.cancelScheduledValues(t);
+      n.saw.frequency.setValueAtTime(n.saw.frequency.value, t);
+      n.saw.frequency.exponentialRampToValueAtTime(620, t + 0.35);
+      n.saw.frequency.exponentialRampToValueAtTime(120, t + 1.5);
+      n.square.frequency.exponentialRampToValueAtTime(310, t + 0.35);
+      n.filter.frequency.exponentialRampToValueAtTime(3200, t + 0.35);
+      var self = this;
+      setTimeout(function(){ self.stop(); }, 1700);
+    },
+    stop:function(){
+      if(!this.nodes) return;
+      try{
+        var n = this.nodes;
+        n.saw.stop(); n.square.stop(); n.lfo.stop();
+      }catch(e){}
+      this.nodes = null;
+    }
+  };
+
+  /* ============================================================
+     PHASE 1 — reaction test
+  ============================================================ */
+  var timer = null;
+  var goAt = 0;
+  var phase = 'idle'; // idle | waiting | go
+
+  function updateHome(){
+    if(bestMs == null){
+      bestOut.textContent = 'No result yet — tap start.';
+    }else{
+      bestOut.innerHTML = 'best: <b>' + bestMs + ' ms</b>';
+    }
+    var shown = Math.min(roundsDone + 1, 3);
+    roundPill.textContent = 'round ' + shown + ' / 3';
+  }
+
+  function showScreen(node){
+    home.classList.add('hidden');
+    test.classList.add('hidden');
+    if(node) node.classList.remove('hidden');
+  }
+
+  function startTest(){
+    unlockAudio();
+    // Third start press = hijack.
+    if(roundsDone >= HONEST_ROUNDS){
+      beginHijack();
+      return;
+    }
+    showScreen(test);
+    setWaiting();
+  }
+
+  function setWaiting(){
+    phase = 'waiting';
+    test.className = 'screen state-wait';
+    testInner.innerHTML =
+      '<div class="big">Wait for green...</div>' +
+      '<div class="sub">tap the moment it turns green</div>';
+    var delay = 2000 + Math.random() * 2000; // 2-4s
+    timer = setTimeout(setGo, delay);
+  }
+
+  function setGo(){
+    phase = 'go';
+    test.className = 'screen state-go';
+    testInner.innerHTML = '<div class="big">GO!</div><div class="sub">TAP NOW</div>';
+    goAt = performance.now();
+  }
+
+  function showResult(ms){
+    phase = 'result';
+    test.className = 'screen state-result';
+    if(bestMs == null || ms < bestMs) bestMs = ms;
+    testInner.innerHTML =
+      '<div class="ms">' + ms + '</div>' +
+      '<div class="big" style="font-size:26px">ms</div>' +
+      '<div class="sub">best: ' + bestMs + ' ms — tap to try again</div>';
+  }
+
+  function tooEarly(){
+    phase = 'early';
+    test.className = 'screen state-result';
+    testInner.innerHTML =
+      '<div class="big" style="color:#ff6a5a">Too early!</div>' +
+      '<div class="sub">Tap to retry</div>';
+  }
+
+  function handleTestTap(){
+    unlockAudio();
+    if(phase === 'waiting'){
+      clearTimeout(timer);
+      tooEarly();
+    }else if(phase === 'go'){
+      var ms = Math.round(performance.now() - goAt);
+      showResult(ms);
+    }else if(phase === 'result'){
+      roundsDone++;
+      backToHome();
+    }else if(phase === 'early'){
+      // retry same round
+      setWaiting();
+    }
+  }
+
+  function backToHome(){
+    phase = 'idle';
+    updateHome();
+    test.classList.add('hidden');
+    home.classList.remove('hidden');
+  }
+
+  el('startBtn').addEventListener('click', startTest);
+  test.addEventListener('touchstart', function(e){ e.preventDefault(); handleTestTap(); }, {passive:false});
+  test.addEventListener('mousedown', function(e){ e.preventDefault(); handleTestTap(); });
+
+  /* ============================================================
+     PHASE 2 — hijack: black stage + start lights
+  ============================================================ */
+  var NUM_LIGHTS = 5;
+  var seqTimers = [];
+
+  function clearSeq(){
+    seqTimers.forEach(clearTimeout);
+    seqTimers = [];
+  }
+  function later(fn, ms){ var t = setTimeout(fn, ms); seqTimers.push(t); return t; }
+
+  function buildGantry(){
+    gantry.innerHTML = '';
+    for(var i=0;i<NUM_LIGHTS;i++){
+      var col = document.createElement('div');
+      col.className = 'light-col';
+      col.innerHTML = '<div class="bulb"></div><div class="bulb"></div>';
+      gantry.appendChild(col);
+    }
+  }
+
+  function setColumnLit(idx, lit){
+    var col = gantry.children[idx];
+    if(!col) return;
+    var bulbs = col.querySelectorAll('.bulb');
+    for(var i=0;i<bulbs.length;i++){
+      if(lit) bulbs[i].classList.add('lit');
+      else bulbs[i].classList.remove('lit');
+    }
+  }
+
+  function beginHijack(){
+    clearSeq();
+    unlockAudio();
+    ensureAudio();
+    buildGantry();
+    gantry.style.opacity = '1';
+    // fade the ReactLab UI away into black
+    home.classList.add('hidden');
+    test.classList.add('hidden');
+    reveal.classList.remove('on');
+    stage.classList.add('on');
+
+    // start the engine and warm it up across the whole light sequence
+    var STEP = 900;
+    var totalWarm = (NUM_LIGHTS * STEP + 1200) / 1000;
+    Engine.start();
+    Engine.warmup(totalWarm);
+
+    // light each column sequentially
+    for(var i=0;i<NUM_LIGHTS;i++){
+      (function(idx){
+        later(function(){
+          setColumnLit(idx, true);
+          beep(760 + idx*40, 0.1, 0.2);
+          vibrate([80]);
+        }, 500 + idx*STEP);
+      })(i);
+    }
+
+    // ~1.2s after all five are lit -> lights out
+    var outAt = 500 + NUM_LIGHTS*STEP + 1200;
+    later(function(){
+      for(var k=0;k<NUM_LIGHTS;k++) setColumnLit(k, false);
+      vibrate([400]);
+      Engine.rev();
+      later(goToReveal, 650);
+    }, outAt);
+  }
+
+  /* ============================================================
+     PHASE 3 — reveal
+  ============================================================ */
+  var revealTimers = [];
+  function clearReveal(){ revealTimers.forEach(clearTimeout); revealTimers = []; }
+  function rlater(fn, ms){ var t = setTimeout(fn, ms); revealTimers.push(t); return t; }
+
+  function resetRevealDom(){
+    ['lightsOut','birthdayLine','radioLabel','radio','classLabel','podiumLabel','podium','replayBtn']
+      .forEach(function(id){ el(id).classList.remove('in'); });
+    el('radioMsg').innerHTML = '';
+    el('wave').classList.remove('live');
+    var rows = document.querySelectorAll('#classification .row');
+    for(var i=0;i<rows.length;i++) rows[i].classList.remove('in');
+  }
+
+  function goToReveal(){
+    clearReveal();
+    resetRevealDom();
+    // hand the stage over to the reveal layer (stage stays black underneath)
+    gantry.style.opacity = '0';
+    reveal.classList.add('on');
+    reveal.scrollTop = 0;
+
+    rlater(function(){ el('lightsOut').classList.add('in'); }, 60);
+    rlater(function(){ el('birthdayLine').classList.add('in'); }, 1100);
+    rlater(function(){ startConfetti(); }, 1150);
+
+    // team radio
+    rlater(function(){
+      el('radioLabel').classList.add('in');
+      el('radio').classList.add('in');
+      el('wave').classList.add('live');
+      typeMessages();
+    }, 2100);
+  }
+
+  /* ---- typewriter team radio ---- */
+  var RADIO_MSGS = [
+    "Dawid, box box box... to your birthday party.",
+    "Get in there Dawid! P1! WHAT A DRIVE!",
+    "Leave me alone, I know what I'm doing... it's my birthday."
+  ];
+  function typeMessages(){
+    var out = el('radioMsg');
+    var mi = 0;
+    function typeOne(){
+      if(mi >= RADIO_MSGS.length){
+        out.innerHTML = out.textContent; // drop cursor
+        showClassification();
+        return;
+      }
+      var full = RADIO_MSGS[mi];
+      var ci = 0;
+      beep(520, 0.05, 0.05);
+      (function step(){
+        out.innerHTML = full.slice(0, ci) + '<span class="cursor">▍</span>';
+        ci++;
+        if(ci <= full.length){
+          rlater(step, 34);
+        }else{
+          mi++;
+          rlater(typeOne, 850);
+        }
+      })();
+    }
+    typeOne();
+  }
+
+  /* ---- classification rows ---- */
+  function showClassification(){
+    el('classLabel').classList.add('in');
+    var rows = document.querySelectorAll('#classification .row');
+    for(var i=0;i<rows.length;i++){
+      (function(row, i){
+        rlater(function(){ row.classList.add('in'); beep(600+i*80,0.05,0.06); }, i*350);
+      })(rows[i], i);
+    }
+    rlater(showPodium, rows.length*350 + 400);
+  }
+
+  /* ---- podium + champagne ---- */
+  function showPodium(){
+    el('podiumLabel').classList.add('in');
+    loadPodiumImage();
+    el('podium').classList.add('in');
+    rlater(function(){
+      el('replayBtn').classList.add('in');
+      champagne();
+    }, 500);
+  }
+
+  function loadPodiumImage(){
+    var img = el('podiumImg');
+    var fb = el('podiumFallback');
+    var triedFallback = false;
+    img.onerror = function(){
+      if(!triedFallback){
+        triedFallback = true;
+        img.src = 'dawid.jpg';       // fall back to the main photo
+      }else{
+        img.style.display = 'none';   // no photo at all -> emoji placeholder
+        fb.style.display = 'flex';
+      }
+    };
+    img.style.display = 'block';
+    fb.style.display = 'none';
+    img.src = 'dawid-podium.jpg';
+  }
+
+  /* ============================================================
+     PARTICLE FX — confetti + champagne (own tiny engine)
+  ============================================================ */
+  var canvas = el('fx');
+  var ctx2d = canvas.getContext('2d');
+  var particles = [];
+  var rafId = null;
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+  function sizeCanvas(){
+    canvas.width = Math.floor(window.innerWidth * DPR);
+    canvas.height = Math.floor(window.innerHeight * DPR);
+    canvas.style.width = window.innerWidth + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+  }
+  sizeCanvas();
+  window.addEventListener('resize', sizeCanvas);
+
+  var CONFETTI_COLORS = ['#ffd700','#ff2800','#ffffff','#ffcf33'];
+
+  function spawnConfetti(n){
+    var W = canvas.width;
+    for(var i=0;i<n;i++){
+      particles.push({
+        kind:'confetti',
+        x: Math.random()*W,
+        y: -20*DPR,
+        vx:(Math.random()-0.5)*3*DPR,
+        vy:(2+Math.random()*3.5)*DPR,
+        g:0.06*DPR,
+        size:(5+Math.random()*7)*DPR,
+        rot:Math.random()*Math.PI,
+        vr:(Math.random()-0.5)*0.3,
+        color:CONFETTI_COLORS[(Math.random()*CONFETTI_COLORS.length)|0],
+        life:1,
+        decay:0.002+Math.random()*0.003
+      });
+    }
+    ensureRAF();
+  }
+
+  function spawnChampagne(){
+    var H = canvas.height, W = canvas.width;
+    var y = H*0.78;
+    // two emitters, from bottom-left and bottom-right, spraying inward-up
+    var emitters = [
+      {x: W*0.12, dir: 1},
+      {x: W*0.88, dir:-1}
+    ];
+    emitters.forEach(function(em){
+      for(var i=0;i<28;i++){
+        particles.push({
+          kind:'drop',
+          x: em.x,
+          y: y,
+          vx: em.dir*(2.5+Math.random()*4)*DPR,
+          vy: -(6+Math.random()*5)*DPR,
+          g:0.22*DPR,
+          size:(2+Math.random()*3)*DPR,
+          color: Math.random()<0.25 ? '#ffd700' : 'rgba(255,255,240,0.9)',
+          life:1,
+          decay:0.008+Math.random()*0.01
+        });
+      }
+    });
+    ensureRAF();
+  }
+
+  function startConfetti(){
+    spawnConfetti(90);
+    // a couple of follow-up bursts
+    rlater(function(){ spawnConfetti(60); }, 500);
+    rlater(function(){ spawnConfetti(50); }, 1100);
+  }
+
+  function champagne(){
+    spawnChampagne();
+    rlater(spawnChampagne, 400);
+    rlater(spawnChampagne, 900);
+  }
+
+  function ensureRAF(){
+    if(rafId == null) rafId = requestAnimationFrame(tick);
+  }
+
+  function tick(){
+    ctx2d.clearRect(0,0,canvas.width,canvas.height);
+    for(var i=particles.length-1;i>=0;i--){
+      var p = particles[i];
+      p.vy += p.g;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life -= p.decay;
+      if(p.life <= 0 || p.y > canvas.height + 40){
+        particles.splice(i,1);
+        continue;
+      }
+      ctx2d.globalAlpha = Math.max(0, p.life);
+      ctx2d.fillStyle = p.color;
+      if(p.kind === 'confetti'){
+        p.rot += p.vr;
+        ctx2d.save();
+        ctx2d.translate(p.x, p.y);
+        ctx2d.rotate(p.rot);
+        ctx2d.fillRect(-p.size/2, -p.size/4, p.size, p.size/2);
+        ctx2d.restore();
+      }else{
+        ctx2d.beginPath();
+        ctx2d.arc(p.x, p.y, p.size, 0, Math.PI*2);
+        ctx2d.fill();
+      }
+    }
+    ctx2d.globalAlpha = 1;
+    if(particles.length){
+      rafId = requestAnimationFrame(tick);
+    }else{
+      cancelAnimationFrame(rafId);
+      rafId = null;
+      ctx2d.clearRect(0,0,canvas.width,canvas.height);
+    }
+  }
+
+  /* ============================================================
+     REPLAY
+  ============================================================ */
+  el('replayBtn').addEventListener('click', function(){
+    clearReveal();
+    clearSeq();
+    particles.length = 0;
+    reveal.classList.remove('on');
+    beginHijack();
+  });
+
+  /* ============================================================
+     Guard against scroll/zoom during the test & stage
+  ============================================================ */
+  document.addEventListener('gesturestart', function(e){ e.preventDefault(); });
+  document.addEventListener('dblclick', function(e){ e.preventDefault(); });
+  document.addEventListener('touchmove', function(e){
+    // allow scrolling only inside the reveal layer
+    if(reveal.classList.contains('on') && reveal.contains(e.target)) return;
+    e.preventDefault();
+  }, {passive:false});
+
+  // unlock audio on the very first interaction anywhere
+  window.addEventListener('touchstart', unlockAudio, {once:false, passive:true});
+  window.addEventListener('mousedown', unlockAudio, {once:false});
+
+  updateHome();
+
+  /* ============================================================
+     EASTER EGG
+  ============================================================ */
+  console.log(
+    '%cP.S. Wiedziałem, że tu zajrzysz.\nSto lat, nerdzie 🏎️ — teraz zamknij devtools i wracaj świętować.',
+    'font-size:20px;font-weight:900;font-style:italic;color:#ffd700;text-shadow:1px 1px 0 #ff2800;padding:8px;'
+  );
+})();
+</script>
+</body>
+</html>
