@@ -362,6 +362,78 @@
   .replay-btn.in{opacity:1;}
   .replay-btn:active{transform:scale(.95);}
 
+  /* LAP badge + checkered flag */
+  .lap-badge{
+    margin-top:16px;
+    display:inline-flex;align-items:center;gap:8px;
+    align-self:center;
+    font-size:13px;font-weight:800;letter-spacing:2px;
+    color:#fff;
+    background:#111319;
+    border:1px solid #2c2f3a;
+    border-radius:999px;
+    padding:8px 16px;
+    opacity:0;transform:translateY(10px);
+    transition:opacity .5s ease, transform .5s ease;
+  }
+  .lap-badge.in{opacity:1;transform:translateY(0);}
+  .lap-badge .flag{font-size:15px;}
+
+  /* your real reaction time -> qualifying / pole */
+  .qualifying{
+    margin-top:20px;
+    width:100%;max-width:420px;
+    align-self:center;
+    background:linear-gradient(135deg, rgba(255,215,0,.16), rgba(255,215,0,.03));
+    border:1px solid var(--gold);
+    border-radius:14px;
+    padding:14px 18px;
+    display:flex;flex-direction:column;gap:2px;align-items:center;
+    opacity:0;transform:scale(.92);
+    transition:opacity .55s ease, transform .55s cubic-bezier(.2,.9,.2,1);
+  }
+  .qualifying.in{opacity:1;transform:scale(1);}
+  .qualifying .q-label{
+    font-size:11px;letter-spacing:2.5px;color:var(--muted);font-weight:700;
+  }
+  .qualifying .q-time{
+    font-size:34px;font-weight:900;color:#fff;
+    font-variant-numeric:tabular-nums;letter-spacing:-1px;line-height:1.1;
+  }
+  .qualifying .q-time b{color:var(--gold);}
+  .qualifying .q-pole{
+    font-size:13px;font-weight:800;font-style:italic;color:var(--gold);
+    letter-spacing:1px;
+  }
+
+  /* tap-to-shoot hint on the podium */
+  .tap-hint{
+    margin-top:12px;align-self:center;
+    font-size:12px;color:var(--muted);letter-spacing:.5px;
+    opacity:0;transition:opacity .5s ease;
+  }
+  .tap-hint.in{opacity:.85;}
+
+  /* checkered-flag wipe transition */
+  #flagWipe{
+    position:absolute;inset:0;
+    z-index:30;
+    pointer-events:none;
+    display:none;
+    background:
+      conic-gradient(#111 90deg, #fff 90deg 180deg, #111 180deg 270deg, #fff 270deg);
+    background-size:44px 44px;
+    transform:translateX(-115%);
+    will-change:transform;
+  }
+  @keyframes flagSweep{
+    0%{transform:translateX(-115%);}
+    45%{transform:translateX(0%);}
+    55%{transform:translateX(0%);}
+    100%{transform:translateX(115%);}
+  }
+  #flagWipe.sweep{display:block;animation:flagSweep .95s ease-in-out forwards;}
+
   /* confetti + champagne canvas overlay */
   #fx{
     position:absolute;inset:0;
@@ -398,10 +470,18 @@
   <!-- ============ PHASE 3: reveal ============ -->
   <div id="reveal" class="screen">
     <div id="lightsOut" class="lights-out">IT'S LIGHTS OUT<br>AND AWAY WE GO...</div>
+    <div id="lapBadge" class="lap-badge">LAP 22 / 22 · CHECKERED FLAG <span class="flag">🏁</span></div>
+
     <div id="birthdayLine" class="birthday-line">
       DAWID KOŃCZY DZIŚ 22 LATA!<br>
       STARY, MYŚLAŁEŚ ŻE NIE PAMIĘTAM O TWOICH URODZINACH? <span class="flag">🏁</span><br>
       WSZYSTKIEGO NAJLEPSZEGO!
+    </div>
+
+    <div id="qualifying" class="qualifying">
+      <span class="q-label">TWÓJ CZAS KWALIFIKACJI</span>
+      <span id="qualiTime" class="q-time">— ms</span>
+      <span class="q-pole">POLE POSITION 🏁</span>
     </div>
 
     <div id="radioLabel" class="section-label">TEAM RADIO</div>
@@ -429,9 +509,13 @@
       <img id="podiumImg" alt="Dawid podium">
       <div id="podiumFallback" class="podium-fallback"><div class="k">🏆</div><div>P1 — DAWID</div></div>
     </div>
+    <div id="tapHint" class="tap-hint">🎉 tapnij ekran, żeby wystrzelić konfetti</div>
 
     <button id="replayBtn" class="replay-btn">🔁 Replay lights</button>
   </div>
+
+  <!-- checkered-flag wipe transition overlay -->
+  <div id="flagWipe"></div>
 
 <script>
 (function(){
@@ -444,6 +528,7 @@
   var HONEST_ROUNDS = 2;     // hijack triggers on the (HONEST_ROUNDS+1)th start
   var bestMs = null;
   var audioUnlocked = false;
+  var revealTapReady = false;
 
   var el = function(id){ return document.getElementById(id); };
   var home = el('home');
@@ -586,6 +671,43 @@
     o.connect(og).connect(ctx.destination);
     o.start(t);
     o.stop(t + 0.13);
+  }
+
+  // Triumphant podium fanfare (generic brass-ish, fully synthesised).
+  function fanfare(){
+    var ctx = ensureAudio();
+    if(!ctx) return;
+    var t0 = ctx.currentTime + 0.06;
+    function note(freq, start, dur, vol){
+      var t = t0 + start;
+      var o1 = ctx.createOscillator();
+      var o2 = ctx.createOscillator();
+      var g = ctx.createGain();
+      var g2 = ctx.createGain();
+      o1.type = 'triangle'; o1.frequency.value = freq;
+      o2.type = 'square';   o2.frequency.value = freq * 2; // brassy overtone
+      g2.gain.value = 0.3;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.03);
+      g.gain.setValueAtTime(vol, t + dur * 0.6);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o1.connect(g);
+      o2.connect(g2).connect(g);
+      g.connect(ctx.destination);
+      o1.start(t); o2.start(t);
+      o1.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
+    }
+    var v = 0.15;
+    note(392, 0.00, 0.16, v);   // G4  da
+    note(392, 0.17, 0.14, v);   // G4  da
+    note(392, 0.33, 0.14, v);   // G4  da
+    note(523, 0.50, 0.46, v);   // C5  daaa
+    note(659, 0.90, 0.26, v*0.95); // E5
+    note(784, 1.14, 0.66, v);   // G5  held
+    // final major chord
+    note(523, 1.5, 0.95, v*0.7);
+    note(659, 1.5, 0.95, v*0.7);
+    note(784, 1.5, 0.95, v*0.8);
   }
 
   // Synthetic revving V10-ish engine using layered oscillators.
@@ -823,8 +945,17 @@
       for(var k=0;k<NUM_LIGHTS;k++) setColumnLit(k, false);
       vibrate([400]);
       Engine.rev();
-      later(goToReveal, 650);
+      flagWipe();                    // checkered flag sweeps across
+      later(goToReveal, 430);        // swap content while the flag covers the screen
     }, outAt);
+  }
+
+  // restart the checkered-flag wipe animation
+  function flagWipe(){
+    var fw = el('flagWipe');
+    fw.classList.remove('sweep');
+    void fw.offsetWidth;   // force reflow so the animation replays
+    fw.classList.add('sweep');
   }
 
   /* ============================================================
@@ -836,7 +967,9 @@
 
   function resetRevealDom(){
     try{ if(window.speechSynthesis) window.speechSynthesis.cancel(); }catch(e){}
-    ['lightsOut','birthdayLine','radioLabel','radio','classLabel','podiumLabel','podium','replayBtn']
+    revealTapReady = false;
+    ['lightsOut','lapBadge','birthdayLine','qualifying','radioLabel','radio',
+     'classLabel','podiumLabel','podium','tapHint','replayBtn']
       .forEach(function(id){ el(id).classList.remove('in'); });
     el('radioMsg').innerHTML = '';
     el('wave').classList.remove('live');
@@ -852,9 +985,14 @@
     reveal.classList.add('on');
     reveal.scrollTop = 0;
 
+    // your real reaction time from the honest rounds -> pole position callback
+    el('qualiTime').innerHTML = (bestMs != null ? '<b>' + bestMs + '</b> ms' : '— ms');
+
     rlater(function(){ el('lightsOut').classList.add('in'); }, 60);
+    rlater(function(){ el('lapBadge').classList.add('in'); beep(880,0.05,0.05); }, 700);
     rlater(function(){ el('birthdayLine').classList.add('in'); }, 1100);
     rlater(function(){ startConfetti(); }, 1150);
+    rlater(function(){ el('qualifying').classList.add('in'); beep(660,0.06,0.06); }, 1650);
 
     // team radio
     rlater(function(){
@@ -862,11 +1000,12 @@
       el('radio').classList.add('in');
       el('wave').classList.add('live');
       typeMessages();
-    }, 2100);
+    }, 2300);
   }
 
   /* ---- typewriter team radio ---- */
   var RADIO_MSGS = [
+    "Radio check, Dawid... do you copy?",
     "Dawid, box box box... to your birthday party.",
     "Get in there Dawid! P1! WHAT A DRIVE!",
     "Leave me alone, I know what I'm doing... it's my birthday."
@@ -915,8 +1054,11 @@
     el('podiumLabel').classList.add('in');
     loadPodiumImage();
     el('podium').classList.add('in');
+    fanfare();                 // triumphant podium fanfare
     rlater(function(){
       el('replayBtn').classList.add('in');
+      el('tapHint').classList.add('in');
+      revealTapReady = true;   // let Dawid tap the screen to shoot confetti
       champagne();
     }, 500);
   }
@@ -1007,6 +1149,30 @@
     ensureRAF();
   }
 
+  // radial confetti burst from a tap point
+  function burstAt(cx, cy){
+    var x = cx * DPR, y = cy * DPR;
+    for(var i=0;i<24;i++){
+      var ang = Math.random() * Math.PI * 2;
+      var spd = (2 + Math.random()*6) * DPR;
+      particles.push({
+        kind:'confetti',
+        x:x, y:y,
+        vx:Math.cos(ang)*spd,
+        vy:Math.sin(ang)*spd - 3*DPR,
+        g:0.12*DPR,
+        size:(5+Math.random()*7)*DPR,
+        rot:Math.random()*Math.PI,
+        vr:(Math.random()-0.5)*0.4,
+        color:CONFETTI_COLORS[(Math.random()*CONFETTI_COLORS.length)|0],
+        life:1,
+        decay:0.006+Math.random()*0.006
+      });
+    }
+    beep(680, 0.03, 0.05);
+    ensureRAF();
+  }
+
   function startConfetti(){
     spawnConfetti(90);
     // a couple of follow-up bursts
@@ -1070,6 +1236,19 @@
     particles.length = 0;
     reveal.classList.remove('on');
     beginHijack();
+  });
+
+  // tap the podium screen to shoot confetti (enabled once the podium is up)
+  reveal.addEventListener('touchstart', function(e){
+    if(!revealTapReady) return;
+    if(e.target.closest && e.target.closest('#replayBtn')) return;
+    var t = e.touches && e.touches[0];
+    if(t) burstAt(t.clientX, t.clientY);
+  }, {passive:true});
+  reveal.addEventListener('mousedown', function(e){
+    if(!revealTapReady) return;
+    if(e.target.closest && e.target.closest('#replayBtn')) return;
+    burstAt(e.clientX, e.clientY);
   });
 
   /* ============================================================
