@@ -399,8 +399,8 @@
   <div id="reveal" class="screen">
     <div id="lightsOut" class="lights-out">IT'S LIGHTS OUT<br>AND AWAY WE GO...</div>
     <div id="birthdayLine" class="birthday-line">
-      DAWID KOŃCZY DZIŚ … LAT?<br>
-      NIE, TO JA PAMIĘTAM O TWOICH URODZINACH <span class="flag">🏁</span><br>
+      DAWID KOŃCZY DZIŚ 22 LATA!<br>
+      STARY, MYŚLAŁEŚ ŻE NIE PAMIĘTAM O TWOICH URODZINACH? <span class="flag">🏁</span><br>
       WSZYSTKIEGO NAJLEPSZEGO!
     </div>
 
@@ -487,6 +487,50 @@
       src.buffer = buf;
       src.connect(ctx.destination);
       src.start(0);
+    }catch(e){}
+    // Warm up speech synthesis inside this real user gesture so the radio
+    // is allowed to speak out loud later (Chrome autoplay/gesture policy).
+    try{
+      if(window.speechSynthesis){
+        loadVoices();
+        var warm = new SpeechSynthesisUtterance(' ');
+        warm.volume = 0;
+        window.speechSynthesis.speak(warm);
+      }
+    }catch(e){}
+  }
+
+  /* ---- Text-to-speech for the team radio (built-in Web Speech API) ---- */
+  var VOICES = [];
+  function loadVoices(){
+    try{ VOICES = window.speechSynthesis.getVoices() || []; }catch(e){ VOICES = []; }
+  }
+  if(window.speechSynthesis){
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+  }
+  function pickVoice(){
+    if(!VOICES.length) loadVoices();
+    if(!VOICES.length) return null;
+    var en = VOICES.filter(function(v){ return /en[-_]/i.test(v.lang); });
+    var pool = en.length ? en : VOICES;
+    // prefer a deeper / male-sounding voice for the "engineer on the radio" vibe
+    var pref = pool.filter(function(v){
+      return /male|man|daniel|fred|arthur|george|uk english male|david|rishi/i.test(v.name);
+    })[0];
+    return pref || pool[0] || null;
+  }
+  function radioSpeak(text){
+    try{
+      if(!window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      var v = pickVoice();
+      if(v){ u.voice = v; u.lang = v.lang; }
+      u.rate = 1.06;   // brisk, like a real race engineer
+      u.pitch = 0.8;   // a touch lower for the radio feel
+      u.volume = 1;
+      window.speechSynthesis.speak(u);
     }catch(e){}
   }
 
@@ -753,6 +797,7 @@
   function rlater(fn, ms){ var t = setTimeout(fn, ms); revealTimers.push(t); return t; }
 
   function resetRevealDom(){
+    try{ if(window.speechSynthesis) window.speechSynthesis.cancel(); }catch(e){}
     ['lightsOut','birthdayLine','radioLabel','radio','classLabel','podiumLabel','podium','replayBtn']
       .forEach(function(id){ el(id).classList.remove('in'); });
     el('radioMsg').innerHTML = '';
@@ -800,6 +845,7 @@
       var full = RADIO_MSGS[mi];
       var ci = 0;
       beep(520, 0.05, 0.05);
+      radioSpeak(full);   // read the message out loud, like a real team radio
       (function step(){
         out.innerHTML = full.slice(0, ci) + '<span class="cursor">▍</span>';
         ci++;
