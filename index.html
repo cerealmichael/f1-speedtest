@@ -486,10 +486,10 @@
 
     <div id="radioLabel" class="section-label">TEAM RADIO</div>
     <div id="radio" class="radio">
-      <img id="radioAvatar" class="avatar" src="dawid.jpg" alt="Dawid" onerror="this.style.display='none';document.getElementById('radioAvatarFallback').style.display='flex';">
+      <img id="radioAvatar" class="avatar" src="dawid.jpg" alt="Dawid" onerror="this.setAttribute('data-broken','1');this.style.display='none';document.getElementById('radioAvatarFallback').style.display='flex';">
       <div id="radioAvatarFallback" class="avatar-fallback">🏎️</div>
       <div class="body">
-        <div class="who"><b>DAW</b> | Team Radio</div>
+        <div id="radioWho" class="who"><b>DAW</b> | Team Radio</div>
         <div id="radioMsg" class="msg"></div>
         <div id="wave" class="wave">
           <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
@@ -605,15 +605,16 @@
     })[0];
     return pref || pool[0] || null;
   }
-  function radioSpeak(text){
+  function radioSpeak(text, opts){
     try{
       if(!window.speechSynthesis) return;
+      opts = opts || {};
       window.speechSynthesis.cancel();
       var u = new SpeechSynthesisUtterance(text);
       var v = pickVoice();
       if(v){ u.voice = v; u.lang = v.lang; }
-      u.rate = 1.06;   // brisk, like a real race engineer
-      u.pitch = 0.8;   // a touch lower for the radio feel
+      u.rate = opts.rate != null ? opts.rate : 1.06;
+      u.pitch = opts.pitch != null ? opts.pitch : 0.8;
       u.volume = 1;
       window.speechSynthesis.speak(u);
     }catch(e){}
@@ -1004,12 +1005,35 @@
   }
 
   /* ---- typewriter team radio ---- */
+  // A real team-radio exchange: the pit-wall engineer and the driver (Dawid),
+  // switching speaker (label + avatar + voice) line by line.
   var RADIO_MSGS = [
-    "Radio check, Dawid... do you copy?",
-    "Dawid, box box box... to your birthday party.",
-    "Get in there Dawid! P1! WHAT A DRIVE!",
-    "Leave me alone, I know what I'm doing... it's my birthday."
+    { name:'PIT WALL', driver:false, text:"Radio check, Dawid... do you copy?" },
+    { name:'PIT WALL', driver:false, text:"Dawid, box box box... to your birthday party." },
+    { name:'PIT WALL', driver:false, text:"Get in there Dawid! P1! WHAT A DRIVE!" },
+    { name:'DAW',      driver:true,  text:"Leave me alone, I know what I'm doing... it's my birthday." }
   ];
+
+  // Update the radio header + avatar to whoever is currently speaking.
+  function setSpeaker(m){
+    el('radioWho').innerHTML = '<b>' + m.name + '</b> | Team Radio';
+    var img = el('radioAvatar');
+    var fb = el('radioAvatarFallback');
+    if(m.driver){
+      // Dawid on the radio -> his photo (or car emoji if it failed to load)
+      fb.textContent = '🏎️';
+      if(img.getAttribute('data-broken') === '1'){
+        img.style.display = 'none'; fb.style.display = 'flex';
+      }else{
+        img.style.display = 'block'; fb.style.display = 'none';
+      }
+    }else{
+      // Pit-wall engineer -> headset avatar
+      img.style.display = 'none';
+      fb.textContent = '🎧';
+      fb.style.display = 'flex';
+    }
+  }
   function typeMessages(){
     var out = el('radioMsg');
     var mi = 0;
@@ -1019,10 +1043,13 @@
         showClassification();
         return;
       }
-      var full = RADIO_MSGS[mi];
+      var m = RADIO_MSGS[mi];
+      var full = m.text;
       var ci = 0;
+      setSpeaker(m);      // switch the header/avatar to whoever is talking
       radioSquelch();     // radio keys on
-      radioSpeak(full);   // read the message out loud, like a real team radio
+      // engineer = calm & lower, driver (Dawid) = higher & more fired-up
+      radioSpeak(full, m.driver ? {pitch:0.95, rate:1.12} : {pitch:0.72, rate:1.02});
       (function step(){
         out.innerHTML = full.slice(0, ci) + '<span class="cursor">▍</span>';
         ci++;
