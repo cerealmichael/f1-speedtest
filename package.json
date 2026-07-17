@@ -1,0 +1,16 @@
+{
+  "name": "reactlab-speedtest",
+  "version": "0.3.1",
+  "private": true,
+  "description": "ReactLab — measure your reflexes (F1 birthday prank)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
