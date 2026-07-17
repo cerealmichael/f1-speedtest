@@ -550,6 +550,44 @@
     o.stop(t + (dur || 0.09) + 0.02);
   }
 
+  // Short radio "squelch" — filtered noise burst + a keying-up chirp,
+  // so the team radio sounds like it's keying on before each message.
+  function radioSquelch(){
+    var ctx = ensureAudio();
+    if(!ctx) return;
+    var t = ctx.currentTime;
+    var dur = 0.16;
+    // band-passed white-noise burst (the static crackle)
+    var buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+    var data = buf.getChannelData(0);
+    for(var i=0;i<data.length;i++){ data[i] = Math.random()*2 - 1; }
+    var noise = ctx.createBufferSource();
+    noise.buffer = buf;
+    var bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 1800;
+    bp.Q.value = 0.7;
+    var ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.0001, t);
+    ng.gain.exponentialRampToValueAtTime(0.12, t + 0.012);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    noise.connect(bp).connect(ng).connect(ctx.destination);
+    noise.start(t);
+    noise.stop(t + dur + 0.02);
+    // quick "key up" chirp on top
+    var o = ctx.createOscillator();
+    var og = ctx.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(1250, t);
+    o.frequency.exponentialRampToValueAtTime(720, t + 0.08);
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(0.07, t + 0.008);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+    o.connect(og).connect(ctx.destination);
+    o.start(t);
+    o.stop(t + 0.13);
+  }
+
   // Synthetic revving V10-ish engine using layered oscillators.
   var Engine = {
     nodes:null,
@@ -844,7 +882,7 @@
       }
       var full = RADIO_MSGS[mi];
       var ci = 0;
-      beep(520, 0.05, 0.05);
+      radioSquelch();     // radio keys on
       radioSpeak(full);   // read the message out loud, like a real team radio
       (function step(){
         out.innerHTML = full.slice(0, ci) + '<span class="cursor">▍</span>';
